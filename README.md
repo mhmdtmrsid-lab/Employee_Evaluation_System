@@ -48,7 +48,7 @@ A comprehensive Flask-based employee evaluation system with dynamic question man
 1. **Clone the repository**
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/mhmdtmrsid-lab/Employee_Evaluation_System.git
 cd Employee_Evaluation_System
 ```
 
