@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .bg-dark-card {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+    }
+
+    .bg-glass {
+        background: var(--surface) !important;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+    }
+
+    [data-theme="dark"] .bg-glass {
+        background: rgba(30, 41, 59, 0.7) !important;
+    }
+
+    .bg-secondary-dim {
+        background-color: var(--surface-hover) !important;
+        opacity: 0.8;
+    }
+
+    .border-thick {
+        border-width: 2px !important;
+    }
+</style>
+<div class="row">
+    <div class="col-md-12 mb-4 animate-fade-up">
+        <h2 class="glow-text">Manager Dashboard</h2>
+        <p class="text-secondary">Overview of all Supervisors and Employees</p>
+        <div id="alert-container"></div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Quick Stats -->
+    <div class="col-md-3 mb-4">
+        <div class="card p-4 h-100 animate-fade-up delay-100">
+            <h5 class="card-title text-muted mb-3">Total Supervisors</h5>
+            <span class="fs-2 text-primary-custom animate-scale">{{ supervisors|length }}</span>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card p-4 h-100 animate-fade-up delay-200">
+            <h5 class="card-title text-muted mb-3">Total Employees</h5>
+            <span class="fs-2 text-success animate-scale">{{ total_employees }}</span>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card p-4 h-100 animate-fade-up delay-300">
+            <h5 class="card-title text-muted mb-3">Avg. Score</h5>
+            <span class="fs-2 text-warning animate-scale">{{ "%.1f"|format(avg_rating) if avg_rating else "N/A"
+                }}</span>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card p-4 h-100 animate-fade-up delay-400">
+            <h5 class="card-title text-muted mb-3">Active Questions</h5>
+            <span class="fs-2 text-info animate-scale">{{ total_questions|default(0) }}</span>
+            <a href="{{ url_for('main.manage_questions') }}" class="btn btn-sm btn-outline-info mt-2">Manage</a>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card p-3 animate-fade-up delay-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <h5 class="mb-0 me-3">Quick Actions</h5>
+                    <div class="vr me-3"></div>
+                    <form action="{{ url_for('main.toggle_evaluations') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="evalToggle" {% if
+                                settings.evaluations_enabled %}checked{% endif %} onchange="this.form.submit()">
+                            <label
+                                class="form-check-label fw-bold {% if settings.evaluations_enabled %}text-success{% else %}text-danger{% endif %}"
+                                for="evalToggle">
+                                Evaluation Status: {{ 'Enabled' if settings.evaluations_enabled else 'Disabled' }}
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('main.manage_questions') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-question-circle"></i> Manage Questions
+                    </a>
+                    <a href="{{ url_for('main.view_evaluations') }}" class="btn btn-outline-success">
+                        <i class="bi bi-clipboard-data"></i> View All Evaluations
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Reports -->
+<div class="row mb-5 animate-fade-up delay-200">
+    <div class="col-md-12">
+        <div class="card p-4 shadow-sm border-0 bg-dark-card text-white">
+            <h4 class="card-title mb-4 glow-text">Monthly Reports</h4>
+            <div class="row">
+                {% for cycle in cycles %}
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 p-3 bg-glass border-primary border-thick">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0 fw-bold">{{ cycle.name }}</h6>
+                            {% if loop.first %}
+                            <span class="badge bg-primary">Current Cycle</span>
+                            {% elif cycle.is_closed %}
+                            <span class="badge bg-secondary text-light">Archived</span>
+                            {% endif %}
+                        </div>
+                        <p class="small mb-3">{{ cycle.evaluations|length }} Evaluations</p>
+                        <a href="{{ url_for('main.export_csv_cycle', cycle_id=cycle.id) }}"
+                            class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-download"></i> Download CSV
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12 text-center py-4">
+                    <p class="text-muted">No monthly evaluation cycles found yet. A cycle will be created automatically
+                        when a supervisor submits an evaluation or accesses an employee profile.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row animate-fade-up delay-300">
+    <div class="col-md-12 mb-5">
+        <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="card-title">Supervisors</h4>
+                <div class="d-flex align-items-center">
+                    <div class="search-container me-3 mb-0">
+                        <input type="text" class="form-control search-input" placeholder="Search Supervisors..."
+                            data-target="supervisorsTableBody">
+                    </div>
+                    <a href="{{ url_for('main.add_supervisor') }}" class="btn btn-primary animate-pulse">+ Add
+                        Supervisor</a>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-secondary">Name</th>
+                            <th class="text-secondary">Email</th>
+                            <th class="text-secondary">Squad</th>
+                            <th class="text-secondary">Avg Rating</th>
+                            <th class="text-secondary">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supervisorsTableBody">
+                        {% for supervisor in supervisors %}
+                        <tr class="wave-slow" id="sup-row-{{ supervisor.id }}">
+                            <td><span class="fw-bold text-primary-custom">{{ supervisor.name }}</span></td>
+                            <td class="text-muted">{{ supervisor.email }}</td>
+                            <td><span class="badge bg-secondary">{{ supervisor.employees|length }}</span></td>
+                            <td>
+                                {% set ratings = [] %}
+                                {% for emp in supervisor.employees %}
+                                {% for ev in emp.evaluations %}
+                                {% if ev.average_score > 0 %}
+                                {% if ratings.append(ev.average_score) %}{% endif %}
+                                {% endif %}
+                                {% endfor %}
+                                {% endfor %}
+                                {% if ratings %}
+                                {{ "%.1f"|format(ratings|sum / ratings|length) }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('main.supervisor_details', supervisor_id=supervisor.id) }}"
+                                    class="btn btn-sm btn-outline-info me-1">View</a>
+                                <a href="{{ url_for('main.edit_supervisor', id=supervisor.id) }}"
+                                    class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+
+                                <button type="button" class="btn btn-sm btn-outline-warning me-1"
+                                    onclick="openPasswordModal('{{ supervisor.id }}', '{{ supervisor.name }}')">
+                                    Pwd
+                                </button>
+
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="openDeleteSupervisorModal('{{ supervisor.id }}', '{{ supervisor.name }}')">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No supervisors found. Click "Add
+                                Supervisor" to begin.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-12">
+        <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="card-title">All Employees</h4>
+                <div class="d-flex align-items-center">
+                    <div class="search-container me-3 mb-0">
+                        <input type="text" class="form-control search-input" placeholder="Search Employees..."
+                            data-target="employeesTableBody">
+                    </div>
+                    <div>
+                        <a href="{{ url_for('main.upload_csv') }}" class="btn btn-outline-success me-2">Upload CSV</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-secondary">Code</th>
+                            <th class="text-secondary">Name</th>
+                            <th class="text-secondary">Supervisor</th>
+                            <th class="text-secondary">Evaluations</th>
+                            <th class="text-secondary">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employeesTableBody">
+                        {% for emp in employees %}
+                        <tr class="wave-slow" id="emp-row-{{ emp.id }}">
+                            <td><code>{{ emp.employee_code }}</code></td>
+                            <td class="fw-bold">{{ emp.name }}</td>
+                            <td>
+                                {% set sup = emp.supervisor %}
+                                {% if sup %}
+                                <a href="{{ url_for('main.supervisor_details', supervisor_id=sup.id) }}">{{ sup.name
+                                    }}</a>
+                                {% else %}
+                                <span class="text-danger">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ emp.evaluations|length }}</td>
+                            <td>
+                                <a href="{{ url_for('main.edit_employee', id=emp.id) }}"
+                                    class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="openDeleteEmployeeModal('{{ emp.id }}', '{{ emp.name }}')">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No employees found. Upload a CSV or ask
+                                a supervisor to add them.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shared Modals (Outside of Tables to Fix Animation Z-Index Issues) -->
+
+<!-- 1. Delete Supervisor Modal -->
+<div class="modal fade" id="deleteSupervisorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Delete Supervisor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete supervisor <strong id="delSupName"></strong>?
+                <br><br>
+                <div class="alert alert-warning small mb-0">
+                    Warning: This action cannot be undone. All assigned personnel records may also be deleted or
+                    unassigned.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteSupBtn">Confirm Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Delete Employee Modal -->
+<div class="modal fade" id="deleteEmployeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Delete Employee</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Delete employee <strong id="delEmpName"></strong>?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteEmpBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Change Password Modal -->
+<div class="modal fade" id="passwordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.change_password') }}">
+                <div class="modal-body">
+                    <p>Changing password for: <strong id="pwdSupName"></strong></p>
+                    {{ pwd_form.hidden_tag() }}
+                    <!-- We manually set the ID field via JS -->
+
+                    <div class="mb-3">
+                        {{ pwd_form.password.label(class="form-label") }}
+                        {{ pwd_form.password(class="form-control", placeholder="New Password") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ pwd_form.confirm_password.label(class="form-label") }}
+                        {{ pwd_form.confirm_password(class="form-control", placeholder="Confirm New Password") }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    {{ pwd_form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

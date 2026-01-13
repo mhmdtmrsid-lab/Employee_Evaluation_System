@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center animate-fade-up">
+    <div class="col-md-8">
+        <div class="card p-4">
+            <h2 class="card-title mb-4">{{ title }}</h2>
+            <div class="alert alert-info mb-4">
+                <strong>Question:</strong> {{ question.question_text }}
+            </div>
+
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+
+                <div class="mb-3">
+                    {{ form.answer_text.label(class="form-label") }}
+                    {% if form.answer_text.errors %}
+                    {{ form.answer_text(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.answer_text.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {{ form.answer_text(class="form-control", placeholder="e.g., Excellent, Good, Fair, Poor") }}
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.score.label(class="form-label") }}
+                    {% if form.score.errors %}
+                    {{ form.score(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.score.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {{ form.score(class="form-control", placeholder="Leave empty if not using scores") }}
+                    {% endif %}
+                    <small class="form-text text-muted">Optional numeric score for this answer (0-100).</small>
+                </div>
+
+                <div class="mb-4">
+                    {{ form.order_index.label(class="form-label") }}
+                    {{ form.order_index(class="form-control", placeholder="0") }}
+                    <small class="form-text text-muted">Lower numbers appear first.</small>
+                </div>
+
+                <div class="d-grid gap-2">
+                    {{ form.submit(class="btn btn-primary animate-pulse") }}
+                    <a href="{{ url_for('main.manage_questions') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

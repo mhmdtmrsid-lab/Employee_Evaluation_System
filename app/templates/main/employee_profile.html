@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4 animate-fade-up">
+        <h2 class="glow-text">{{ employee.name }}</h2>
+        <p class="text-secondary">Employee Code: <code>{{ employee.employee_code }}</code></p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Employee Info & Stats -->
+    <div class="col-md-4 mb-4">
+        <div class="card p-4 h-100 animate-fade-up delay-100">
+            <h5 class="card-title text-muted mb-3">Employee Information</h5>
+            <div class="mb-3">
+                <strong>Name:</strong><br>
+                <span class="text-primary-custom">{{ employee.name }}</span>
+            </div>
+            <div class="mb-3">
+                <strong>Code:</strong><br>
+                <code>{{ employee.employee_code }}</code>
+            </div>
+            <div class="mb-3">
+                <strong>Supervisor:</strong><br>
+                <span class="text-primary-custom">{{ employee.supervisor.name }}</span>
+            </div>
+            <div class="mb-3">
+                <strong>Total Evaluations:</strong><br>
+                <span class="badge bg-primary fs-6">{{ employee.evaluations|length }}</span>
+            </div>
+            {% if employee.evaluations %}
+            <div class="mb-3">
+                <strong>Average Score:</strong><br>
+                {% set scores = [] %}
+                {% for eval in employee.evaluations %}
+                {% if eval.average_score > 0 %}
+                {% if scores.append(eval.average_score) %}{% endif %}
+                {% endif %}
+                {% endfor %}
+                {% if scores %}
+                <span class="badge bg-success fs-6">{{ "%.1f"|format(scores|sum / scores|length) }}</span>
+                {% else %}
+                <span class="text-muted">N/A</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Evaluation Form -->
+    <div class="col-md-8 mb-4">
+        <div class="card p-4 animate-fade-up delay-200">
+            <h5 class="card-title mb-4">
+                <i class="bi bi-clipboard-check"></i> Submit New Evaluation
+                {% if current_cycle %}
+                <span
+                    class="badge {% if not settings.evaluations_enabled %}bg-danger{% else %}bg-primary{% endif %} float-end">
+                    {{ current_cycle.name }}
+                    {% if not settings.evaluations_enabled %}(DISABLED){% endif %}
+                </span>
+                {% endif %}
+            </h5>
+
+            {% if not settings.evaluations_enabled %}
+            <div class="alert alert-warning mb-4 shadow-sm border-0">
+                <div class="d-flex">
+                    <div class="me-3">
+                        <i class="bi bi-pause-circle-fill fs-2"></i>
+                    </div>
+                    <div>
+                        <h6 class="alert-heading fw-bold">Evaluations Temporarily Disabled</h6>
+                        <p class="mb-0">Evaluations are currently closed by the Manager. Please try again later.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% set is_disabled = not settings.evaluations_enabled %}
+            <form method="POST" action="" {% if is_disabled %}class="opacity-50 pointer-none" {% endif %}>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+                <!-- Dynamic Questions -->
+                {% if questions %}
+                {% for question in questions %}
+                <div class="card mb-3 wave-slow">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-3 text-primary-custom">{{ question.question_text }}</h6>
+                        <div class="form-check-group">
+                            {% set field_name = 'question_' ~ question.id %}
+                            {% for answer in question.answers|sort(attribute='order_index') %}
+                            <div class="form-check mb-2">
+                                <input type="radio" class="form-check-input" name="{{ field_name }}"
+                                    value="{{ answer.id }}" id="{{ field_name }}_{{ answer.id }}" required {% if
+                                    is_disabled %}disabled{% endif %}>
+                                <label class="form-check-label" for="{{ field_name }}_{{ answer.id }}">
+                                    {{ answer.answer_text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> No evaluation questions available. Please contact the
+                    manager to create evaluation questions.
+                </div>
+                {% endif %}
+
+
+                <!-- Overall Notes -->
+                <div class="mb-4">
+                    <label for="notes" class="form-label">Overall Notes (Optional)</label>
+                    <textarea name="notes" id="notes" class="form-control" rows="4"
+                        placeholder="Add any additional comments or observations..." {% if is_disabled %}disabled{%
+                        endif %}></textarea>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg animate-pulse" {% if is_disabled %}disabled{%
+                        endif %}>
+                        {% if is_disabled %}Submission Locked{% else %}Submit Evaluation{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Evaluation History -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card p-4 animate-fade-up delay-300">
+            <h5 class="card-title mb-4">
+                <i class="bi bi-clock-history"></i> Evaluation History
+            </h5>
+
+            {% if employee.evaluations %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-secondary">Date</th>
+                            <th class="text-secondary">Supervisor</th>
+                            <th class="text-secondary">Responses</th>
+                            <th class="text-secondary">Avg Score</th>
+                            <th class="text-secondary">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evaluation in employee.evaluations|reverse %}
+                        <tr class="wave-slow">
+                            <td>{{ evaluation.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ evaluation.supervisor.name }}</td>
+                            <td><span class="badge bg-info">{{ evaluation.responses|length }} questions</span></td>
+                            <td>
+                                {% if evaluation.average_score > 0 %}
+                                <span class="badge bg-success">{{ "%.1f"|format(evaluation.average_score) }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if evaluation.notes %}
+                                <small class="text-muted">{{ evaluation.notes[:100] }}{% if evaluation.notes|length >
+                                    100 %}...{% endif %}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No evaluations yet. Submit the first evaluation above.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

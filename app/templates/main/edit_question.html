@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center animate-fade-up">
+    <div class="col-md-8">
+        <div class="card p-4">
+            <h2 class="card-title mb-4">{{ title }}</h2>
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+
+                <div class="mb-3">
+                    {{ form.question_text.label(class="form-label") }}
+                    {% if form.question_text.errors %}
+                    {{ form.question_text(class="form-control is-invalid", rows="3") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.question_text.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {{ form.question_text(class="form-control", rows="3") }}
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.order_index.label(class="form-label") }}
+                    {{ form.order_index(class="form-control") }}
+                </div>
+
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        {{ form.is_active(class="form-check-input") }}
+                        {{ form.is_active.label(class="form-check-label") }}
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    {{ form.submit(class="btn btn-primary animate-pulse") }}
+                    <a href="{{ url_for('main.manage_questions') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

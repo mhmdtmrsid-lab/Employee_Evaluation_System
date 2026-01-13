@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center animate-fade-up">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h2 class="card-title mb-4">Upload Employee CSV</h2>
+
+            <div class="alert alert-info">
+                <strong>Format Required:</strong><br>
+                Column 1: Name<br>
+                Column 2: Employee Code<br>
+                Column 3: Supervisor Email
+            </div>
+
+            <form method="POST" action="" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.file.label(class="form-label") }}
+                    {% if form.file.errors %}
+                    {{ form.file(class="form-control is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.file.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    {{ form.file(class="form-control") }}
+                    {% endif %}
+                </div>
+
+                <div class="d-grid gap-2">
+                    {{ form.submit(class="btn btn-primary animate-pulse") }}
+                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

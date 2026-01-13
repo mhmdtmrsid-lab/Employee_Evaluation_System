@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4 animate-fade-up">
+        <h2 class="glow-text">All Evaluations</h2>
+        <p class="text-secondary">View and filter all employee evaluations</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card p-4 animate-fade-up delay-100">
+            <h5 class="card-title mb-3">Filters</h5>
+            <form method="GET" action="{{ url_for('main.view_evaluations') }}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="employee_id" class="form-label">Employee</label>
+                        <select id="employee_id" name="employee_id" class="form-select">
+                            <option value="">All Employees</option>
+                            {% for emp in employees %}
+                            <option value="{{ emp.id }}" {% if request.args.get('employee_id')|int==emp.id %}selected{%
+                                endif %}>
+                                {{ emp.name }} ({{ emp.employee_code }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="supervisor_id" class="form-label">Supervisor</label>
+                        <select id="supervisor_id" name="supervisor_id" class="form-select">
+                            <option value="">All Supervisors</option>
+                            {% for sup in supervisors %}
+                            <option value="{{ sup.id }}" {% if request.args.get('supervisor_id')|int==sup.id
+                                %}selected{% endif %}>
+                                {{ sup.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_from" class="form-label">From Date</label>
+                        <input type="date" id="date_from" name="date_from" class="form-control"
+                            value="{{ request.args.get('date_from', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_to" class="form-label">To Date</label>
+                        <input type="date" id="date_to" name="date_to" class="form-control"
+                            value="{{ request.args.get('date_to', '') }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card p-4 animate-fade-up delay-200">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title mb-0">
+                    Evaluations ({{ evaluations|length }})
+                </h5>
+                {% if evaluations %}
+                <div>
+                    {% set total_scores = [] %}
+                    {% for eval in evaluations %}
+                    {% if eval.average_score > 0 %}
+                    {% if total_scores.append(eval.average_score) %}{% endif %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if total_scores %}
+                    <span class="badge bg-success fs-6">
+                        Overall Avg: {{ "%.1f"|format(total_scores|sum / total_scores|length) }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if evaluations %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-secondary">Date</th>
+                            <th class="text-secondary">Employee</th>
+                            <th class="text-secondary">Supervisor</th>
+                            <th class="text-secondary">Questions</th>
+                            <th class="text-secondary">Avg Score</th>
+                            <th class="text-secondary">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evaluation in evaluations %}
+                        <tr class="wave-slow">
+                            <td>{{ evaluation.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <strong>{{ evaluation.employee.name }}</strong><br>
+                                <small class="text-muted">{{ evaluation.employee.employee_code }}</small>
+                            </td>
+                            <td>{{ evaluation.supervisor.name }}</td>
+                            <td><span class="badge bg-info">{{ evaluation.responses|length }}</span></td>
+                            <td>
+                                {% if evaluation.average_score > 0 %}
+                                <span class="badge bg-success">{{ "%.1f"|format(evaluation.average_score) }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('main.evaluation_detail', id=evaluation.id) }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    View Details
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No evaluations found matching your filters.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

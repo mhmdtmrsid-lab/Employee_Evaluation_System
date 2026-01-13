@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4 animate-fade-up">
+        <h2 class="glow-text">Evaluation Questions Management</h2>
+        <p class="text-secondary">Create and manage dynamic evaluation questions for supervisors</p>
+        <div id="alert-container"></div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card p-4 animate-fade-up delay-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="card-title mb-0">Active Questions ({{ questions|selectattr('is_active')|list|length }})</h4>
+                <a href="{{ url_for('main.add_question') }}" class="btn btn-primary animate-pulse">
+                    <i class="bi bi-plus-circle"></i> Add New Question
+                </a>
+            </div>
+
+            {% if questions %}
+            <div class="accordion" id="questionsAccordion">
+                {% for question in questions %}
+                <div class="accordion-item mb-3 wave-slow" id="question-{{ question.id }}">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#collapse{{ question.id }}">
+                            <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                <span class="fw-bold">
+                                    <span class="badge bg-secondary me-2">{{ question.order_index }}</span>
+                                    {{ question.question_text }}
+                                </span>
+                                <span class="badge {% if question.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if question.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ question.id }}"
+                        class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                        data-bs-parent="#questionsAccordion">
+                        <div class="accordion-body">
+                            <div class="mb-3">
+                                <strong>Answers ({{ question.answers|length }}):</strong>
+                                {% if question.answers %}
+                                <ul class="list-group mt-2">{% for answer in question.answers %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-info me-2">{{ answer.order_index }}</span>
+                                            {{ answer.answer_text }}
+                                            {% if answer.score is not none %}
+                                            <span class="badge bg-primary ms-2">Score: {{ answer.score }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <a href="{{ url_for('main.edit_answer', id=answer.id) }}"
+                                                class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                data-id="{{ answer.id }}" data-text="{{ answer.answer_text }}"
+                                                onclick="deleteAnswer(this.dataset.id, this.dataset.text)">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <p class="text-muted mt-2">No answers yet.</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('main.add_answer', question_id=question.id) }}"
+                                    class="btn btn-sm btn-success">
+                                    <i class="bi bi-plus"></i> Add Answer
+                                </a>
+                                <a href="{{ url_for('main.edit_question', id=question.id) }}"
+                                    class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-pencil"></i> Edit Question
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-id="{{ question.id }}"
+                                    data-text="{{ question.question_text[:50] }}"
+                                    onclick="deleteQuestion(this.dataset.id, this.dataset.text)">
+                                    <i class="bi bi-trash"></i> Delete Question
+                                </button>
+                            </div>
+
+                            <div class="mt-3 text-muted small">
+                                <i class="bi bi-clock"></i> Created: {{ question.created_at.strftime('%Y-%m-%d %H:%M')
+                                }}
+                                {% if question.updated_at != question.created_at %}
+                                | Updated: {{ question.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No questions created yet. Click "Add New Question" to begin.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function deleteQuestion(id, text) {
+        if (confirm(`Delete question: "${text}..."?\n\nThis will also delete all associated answers and responses.`)) {
+            fetch(`/manager/questions/delete/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const elem = document.getElementById(`question-${id}`);
+                        elem.classList.add('fade-out-row');
+                        setTimeout(() => elem.remove(), 500);
+                        showAlert('success', data.message);
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'An error occurred');
+                });
+        }
+    }
+
+    function deleteAnswer(id, text) {
+        if (confirm(`Delete answer: "${text}"?`)) {
+            fetch(`/manager/answers/delete/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        location.reload();
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'An error occurred');
+                });
+        }
+    }
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    function showAlert(type, message) {
+        const container = document.getElementById('alert-container');
+        if (!container) return;
+
+        const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show animate-fade-up" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+        container.innerHTML = alertHtml;
+
+        setTimeout(() => {
+            const alert = container.querySelector('.alert');
+            if (alert) new bootstrap.Alert(alert).close();
+        }, 4000);
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-6">
+        <h2>Employees Directory</h2>
+    </div>
+    <div class="col-md-6">
+        <div class="search-container mb-0">
+            <input type="text" class="form-control search-input" placeholder="Search by name or code..."
+                data-target="employeesGrid">
+        </div>
+    </div>
+</div>
+
+<div class="row" id="employeesGrid">
+    {% for employee in employees %}
+    <div class="col-md-4 mb-4 search-item">
+        <div class="card p-3 h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ employee.name }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">ID: {{ employee.employee_code }}</h6>
+                <p class="card-text text-secondary">
+                    Evaluations: {{ employee.evaluations|length }}
+                </p>
+                <a href="{{ url_for('main.employee_profile', employee_id=employee.id) }}"
+                    class="btn btn-outline-primary btn-sm stretched-link">View Profile</a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <p class="text-muted">No employees found.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

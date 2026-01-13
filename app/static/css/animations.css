@@ -1,0 +1,269 @@
+/* --- ANIMATIONS & MOTION --- */
+
+/* 1. KEYFRAMES */
+
+/* Fade In Up - Cards & Content Entrance */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 20px, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* Pulse - Important Buttons Hover Effect */
+@keyframes pulse-soft {
+    0% {
+        box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+    }
+}
+
+/* Scale In - Badges & Numbers Entrance */
+@keyframes scaleIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Global Flash Loop - Replaces static glow for emphasis */
+@keyframes flashLoop {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* Wave Slow - Gentle relaxing motion for dashboard elements */
+@keyframes waveSlow {
+
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translateY(-4px);
+        opacity: 0.9;
+    }
+}
+
+/* Text Wave - Subtle color/opacity wave for text */
+@keyframes waveText {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: translateY(-2px);
+        text-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+    }
+}
+
+/* TV Glitch & Strong Flash - Navbar Brand Effect */
+@keyframes tvFlashLoop {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+        text-shadow: none;
+    }
+
+    /* Irregular Flicker */
+    2% {
+        opacity: 0.8;
+        transform: translate(1px, 0);
+    }
+
+    4% {
+        opacity: 1;
+        transform: translate(-1px, 0);
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    10.1% {
+        opacity: 0.4;
+        transform: skewX(2deg);
+    }
+
+    10.2% {
+        opacity: 1;
+        transform: skewX(0);
+    }
+
+    /* Horizontal Micro-shake */
+    25% {
+        transform: translate(0, 0);
+    }
+
+    25.1% {
+        transform: translate(-2px, 0);
+    }
+
+    25.2% {
+        transform: translate(2px, 0);
+    }
+
+    25.3% {
+        transform: translate(0, 0);
+    }
+
+    /* Opacity Drop */
+    30% {
+        opacity: 1;
+    }
+
+    30.1% {
+        opacity: 0.3;
+    }
+
+    30.2% {
+        opacity: 1;
+    }
+
+    /* The Strong Flash with RGB Split */
+    55% {
+        opacity: 1;
+        text-shadow: none;
+        transform: scale(1);
+    }
+
+    55.1% {
+        opacity: 1;
+        transform: scale(1.05);
+        text-shadow:
+            0 0 25px var(--accent),
+            3px 0 0 rgba(255, 0, 80, 0.7),
+            -3px 0 0 rgba(0, 255, 255, 0.7);
+    }
+
+    55.2% {
+        opacity: 0.8;
+    }
+
+    55.4% {
+        opacity: 1;
+        transform: scale(1);
+        text-shadow: none;
+    }
+
+    /* More Flicker */
+    70% {
+        opacity: 1;
+    }
+
+    70.1% {
+        opacity: 0.5;
+    }
+
+    70.2% {
+        opacity: 1;
+    }
+
+    /* Another jitter */
+    80% {
+        transform: translate(0, 0);
+    }
+
+    80.1% {
+        transform: translate(-1px, 1px);
+    }
+
+    80.3% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+        text-shadow: none;
+    }
+}
+
+/* 2. UTILITY CLASSES */
+
+.animate-fade-up {
+    animation-name: fadeInUp;
+    animation-duration: 0.6s;
+    animation-fill-mode: both;
+}
+
+.delay-100 {
+    animation-delay: 100ms;
+}
+
+.delay-200 {
+    animation-delay: 200ms;
+}
+
+.delay-300 {
+    animation-delay: 300ms;
+}
+
+.animate-pulse:hover {
+    animation: pulse-soft 2s infinite;
+}
+
+.animate-scale {
+    /* Use waveSlow for continuous gentle motion instead of just entrance scale */
+    animation: waveSlow 8s ease-in-out infinite;
+}
+
+.brand-tv-flash {
+    animation: tvFlashLoop 4s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+    display: inline-block;
+    will-change: transform, opacity, text-shadow;
+}
+
+/* Wave Classes */
+.wave-slow {
+    animation: waveSlow 10s ease-in-out infinite;
+}
+
+.wave-text {
+    animation: waveText 8s ease-in-out infinite;
+    display: inline-block;
+    /* Required for transform */
+}
+
+/* 3. ACCESSIBILITY */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
