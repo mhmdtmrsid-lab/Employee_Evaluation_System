@@ -5,3 +5,5 @@ instance/
 .DS_Store
 venv/
 env/
+*.db
+site.db
