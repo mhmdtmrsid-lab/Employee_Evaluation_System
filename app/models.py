@@ -2,11 +2,17 @@ from datetime import datetime
 import calendar
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import select
 from app import db, login_manager
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Supervisor.query.get(int(user_id))
+    """Load user from database by ID for Flask-Login session management"""
+    try:
+        # Use modern SQLAlchemy 2.0 API
+        return db.session.get(Supervisor, int(user_id))
+    except (ValueError, TypeError):
+        return None
 
 class Supervisor(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -87,11 +93,10 @@ class QuestionAnswer(db.Model):
         return f"QuestionAnswer('{self.answer_text}', score={self.score})"
 
 class EvaluationCycle(db.Model):
-    """Groups evaluations by month and year"""
+    """Groups evaluations by month and year - for display/organization ONLY, not for blocking"""
     id = db.Column(db.Integer, primary_key=True)
     month = db.Column(db.Integer, nullable=False)
     year = db.Column(db.Integer, nullable=False)
-    is_closed = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     # Relationship to evaluations
@@ -103,21 +108,17 @@ class EvaluationCycle(db.Model):
 
     @staticmethod
     def get_or_create_current():
+        """Get or create the current month's cycle"""
         now = datetime.utcnow()
-        cycle = EvaluationCycle.query.filter_by(month=now.month, year=now.year, is_closed=False).first()
+        cycle = EvaluationCycle.query.filter_by(month=now.month, year=now.year).first()
         if not cycle:
-            # Check if a closed cycle exists for this month/year
-            existing_closed = EvaluationCycle.query.filter_by(month=now.month, year=now.year, is_closed=True).first()
-            if not existing_closed:
-                cycle = EvaluationCycle(month=now.month, year=now.year)
-                db.session.add(cycle)
-                db.session.commit()
-            else:
-                return existing_closed
+            cycle = EvaluationCycle(month=now.month, year=now.year)
+            db.session.add(cycle)
+            db.session.commit()
         return cycle
 
     def __repr__(self):
-        return f"EvaluationCycle({self.month}/{self.year}, is_closed={self.is_closed})"
+        return f"EvaluationCycle({self.month}/{self.year})"
 
 class SystemSettings(db.Model):
     """Global system configuration"""
@@ -155,10 +156,14 @@ class Evaluation(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     notes = db.Column(db.Text, nullable=True)  # Optional overall notes
     
+    # Year and Month for this evaluation (immutable once created)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)
+    
     # Foreign Keys
     supervisor_id = db.Column(db.Integer, db.ForeignKey('supervisor.id'), nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    cycle_id = db.Column(db.Integer, db.ForeignKey('evaluation_cycle.id'), nullable=True) # Temporarily nullable for migration
+    cycle_id = db.Column(db.Integer, db.ForeignKey('evaluation_cycle.id'), nullable=True) # For historical grouping
     
     # Relationships
     responses = db.relationship('EvaluationResponse', backref='evaluation', lazy=True, cascade='all, delete-orphan')

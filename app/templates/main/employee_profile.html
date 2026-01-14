@@ -119,9 +119,10 @@
                 </div>
 
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg animate-pulse" {% if is_disabled %}disabled{%
-                        endif %}>
-                        {% if is_disabled %}Submission Locked{% else %}Submit Evaluation{% endif %}
+                    <button type="submit" class="btn btn-primary btn-lg animate-pulse" {% if is_disabled or not
+                        questions %}disabled{% endif %}>
+                        {% if is_disabled %}Submission Locked{% elif not questions %}No Questions Available{% else
+                        %}Submit Evaluation{% endif %}
                     </button>
                 </div>
             </form>

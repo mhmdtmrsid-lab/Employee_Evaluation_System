@@ -10,8 +10,6 @@ from app.main.forms import (EvaluationForm, AddSupervisorForm, AddEmployeeForm, 
 from app import db
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from sqlalchemy import func
-from sqlalchemy.orm import joinedload
 
 # --- DASHBOARD & SHARED ---
 
@@ -20,19 +18,19 @@ from sqlalchemy.orm import joinedload
 @login_required
 def dashboard():
     if current_user.is_manager:
-        # Optimized with joinedload to prevent N+1 queries in the template
-        supervisors = Supervisor.query.filter_by(role='supervisor')\
-            .options(joinedload(Supervisor.employees).joinedload(Employee.evaluations))\
-            .all()
-            
-        all_employees = Employee.query.options(joinedload(Employee.supervisor)).all()
-        total_employees = Employee.query.count()
+        supervisors = Supervisor.query.filter_by(role='supervisor').all()
+        all_employees = Employee.query.all()
+        total_employees = len(all_employees)
         
-        # Calculate average score efficiently using a database query
-        avg_score_query = db.session.query(func.avg(EvaluationResponse.score)).scalar()
-        avg_score = avg_score_query if avg_score_query is not None else 0
-        
+        all_evals = Evaluation.query.all()
         total_questions = EvaluationQuestion.query.filter_by(is_active=True).count()
+        
+        # Calculate average score from new system
+        avg_score = 0
+        if all_evals:
+            scores = [e.average_score for e in all_evals if e.responses]
+            avg_score = sum(scores) / len(scores) if scores else 0
+        
         pwd_form = ChangePasswordForm()
         cycles = EvaluationCycle.query.order_by(EvaluationCycle.year.desc(), EvaluationCycle.month.desc()).all()
         settings = SystemSettings.get_settings()
@@ -82,20 +80,25 @@ def employee_profile(employee_id):
     settings = SystemSettings.get_settings()
     
     if request.method == 'POST':
-        if current_cycle.is_closed:
-            flash('The evaluation cycle for this month is closed. No new evaluations can be submitted.', 'danger')
-            return redirect(url_for('main.employee_profile', employee_id=employee_id))
-            
+        # ONLY check SystemSettings.evaluations_enabled - this is the single source of truth
         if not settings.evaluations_enabled:
             flash('Evaluations are currently disabled by the Manager.', 'danger')
             return redirect(url_for('main.employee_profile', employee_id=employee_id))
+        
+        # Prevent submission if no questions exist
+        if not questions:
+            flash('No evaluation questions have been created yet. Please ask the manager to create questions.', 'danger')
+            return redirect(url_for('main.employee_profile', employee_id=employee_id))
 
-        # Create main evaluation record
+        # Create main evaluation record with year and month
+        now = datetime.utcnow()
         evaluation = Evaluation(
             supervisor_id=current_user.id,
             employee_id=employee.id,
             notes=request.form.get('notes', ''),
-            cycle_id=current_cycle.id
+            cycle_id=current_cycle.id,
+            year=now.year,
+            month=now.month
         )
         db.session.add(evaluation)
         db.session.flush()
@@ -245,30 +248,24 @@ def view_evaluations():
     # Get filter parameters
     employee_id = request.args.get('employee_id', type=int)
     supervisor_id = request.args.get('supervisor_id', type=int)
-    date_from = request.args.get('date_from')
-    date_to = request.args.get('date_to')
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
     
-    # Build query with joinedload for efficiency
-    query = Evaluation.query.options(
-        joinedload(Evaluation.employee),
-        joinedload(Evaluation.supervisor)
-    )
+    # Build query - use year and month directly from Evaluation
+    query = Evaluation.query
     
     if employee_id:
         query = query.filter_by(employee_id=employee_id)
     if supervisor_id:
         query = query.filter_by(supervisor_id=supervisor_id)
-    if date_from:
-        query = query.filter(Evaluation.created_at >= datetime.strptime(date_from, '%Y-%m-%d'))
-    if date_to:
-        query = query.filter(Evaluation.created_at <= datetime.strptime(date_to, '%Y-%m-%d'))
+    if year:
+        query = query.filter_by(year=year)
+    if month:
+        query = query.filter_by(month=month)
     
-    # Limit to 1000 for safety in dashboard view
-    evaluations = query.order_by(Evaluation.created_at.desc()).limit(1000).all()
-    
-    # Efficient entities for dropdowns
-    employees = Employee.query.with_entities(Employee.id, Employee.name).all()
-    supervisors = Supervisor.query.filter_by(role='supervisor').with_entities(Supervisor.id, Supervisor.name).all()
+    evaluations = query.order_by(Evaluation.created_at.desc()).all()
+    employees = Employee.query.all()
+    supervisors = Supervisor.query.filter_by(role='supervisor').all()
     
     return render_template('main/view_evaluations.html', 
                            evaluations=evaluations,
@@ -279,11 +276,7 @@ def view_evaluations():
 @login_required
 def evaluation_detail(id):
     if not current_user.is_manager: abort(403)
-    evaluation = Evaluation.query.options(
-        joinedload(Evaluation.responses).joinedload(EvaluationResponse.selected_answer),
-        joinedload(Evaluation.employee),
-        joinedload(Evaluation.supervisor)
-    ).get_or_404(id)
+    evaluation = Evaluation.query.get_or_404(id)
     return render_template('main/evaluation_detail.html', evaluation=evaluation)
 
 @main.route("/manager/export-csv/<int:cycle_id>")
@@ -293,17 +286,13 @@ def export_csv_cycle(cycle_id):
     
     cycle = EvaluationCycle.query.get_or_404(cycle_id)
     
-    # Get all evaluations for this cycle with optimized relationship loading
-    evaluations = Evaluation.query.filter_by(cycle_id=cycle.id)\
-        .options(joinedload(Evaluation.employee), 
-                 joinedload(Evaluation.supervisor),
-                 joinedload(Evaluation.responses).joinedload(EvaluationResponse.selected_answer))\
-        .all()
+    # Get all evaluations for this cycle (read-only, no modifications)
+    evaluations = Evaluation.query.filter_by(cycle_id=cycle.id).all()
     
     # Get all questions (ordered)
     questions = EvaluationQuestion.query.order_by(EvaluationQuestion.order_index).all()
     
-    # Create CSV
+    # Create CSV in memory - no database changes
     si = io.StringIO()
     si.write('\ufeff')
     cw = csv.writer(si)
@@ -317,7 +306,7 @@ def export_csv_cycle(cycle_id):
     # Rows
     for e in evaluations:
         row = [e.employee.name, e.employee.employee_code, e.supervisor.email]
-        # Map question responses for this evaluation efficiently
+        # Map question responses for this evaluation
         responses = {r.question_id: r.selected_answer.answer_text for r in e.responses}
         for q in questions:
             row.append(responses.get(q.id, ''))
@@ -329,6 +318,7 @@ def export_csv_cycle(cycle_id):
     
     filename = f"evaluations_{cycle.year}_{cycle.month:02d}.csv"
     
+    # Return file without any database modifications
     return send_file(output, mimetype='text/csv; charset=utf-8', as_attachment=True, download_name=filename)
 
 @main.route("/manager/settings/toggle-evaluations", methods=['POST'])
@@ -471,35 +461,24 @@ def upload_csv():
         csv_input = csv.reader(stream)
         rows_processed = 0
         errors = []
-        
-        # Optimization: Pre-fetch supervisors and existing codes to avoid queries in loop
-        supervisors = {s.email: s.id for s in Supervisor.query.filter_by(role='supervisor').all()}
-        existing_codes = {e.employee_code for e in Employee.query.with_entities(Employee.employee_code).all()}
-        
         for i, row in enumerate(csv_input):
-            if i == 0 and ("Name" in row[0] or "name" in row[0].lower()): continue 
+            if i == 0 and "Name" in row[0]: continue 
             if len(row) < 3:
                 errors.append(f"Row {i+1}: Not enough columns.")
                 continue
-                
             name = row[0].strip()
             code = row[1].strip()
             sup_email = row[2].strip()
-            
-            sup_id = supervisors.get(sup_email)
-            if not sup_id:
+            supervisor = Supervisor.query.filter_by(email=sup_email).first()
+            if not supervisor:
                 errors.append(f"Row {i+1}: Supervisor {sup_email} not found.")
                 continue
-                
-            if code in existing_codes:
+            if Employee.query.filter_by(employee_code=code).first():
                 errors.append(f"Row {i+1}: Code {code} already exists.")
                 continue
-                
-            new_emp = Employee(name=name, employee_code=code, supervisor_id=sup_id)
+            new_emp = Employee(name=name, employee_code=code, supervisor_id=supervisor.id)
             db.session.add(new_emp)
-            existing_codes.add(code) # Prevent duplicate codes in same upload
             rows_processed += 1
-            
         if rows_processed > 0:
             try:
                 db.session.commit()

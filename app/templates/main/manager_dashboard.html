@@ -111,8 +111,8 @@
                             <h6 class="mb-0 fw-bold">{{ cycle.name }}</h6>
                             {% if loop.first %}
                             <span class="badge bg-primary">Current Cycle</span>
-                            {% elif cycle.is_closed %}
-                            <span class="badge bg-secondary text-light">Archived</span>
+                            {% else %}
+                            <span class="badge bg-secondary text-light">Past</span>
                             {% endif %}
                         </div>
                         <p class="small mb-3">{{ cycle.evaluations|length }} Evaluations</p>
